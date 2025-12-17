@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { FiCheckCircle, FiAward } from "react-icons/fi";
-import "./skills.css";
+import "./Skills.css";
 
 export default function Skills() {
   const [field, setField] = useState("");
