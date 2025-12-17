@@ -1,62 +1,48 @@
 // src/services/weather.js
 import axios from "axios";
 
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-
-// Step 1 — Convert city → coordinates
+// Open-Meteo Geocoding
 async function getCoordinates(city) {
   try {
-    const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json`;
-
-    const res = await axios.get(geoUrl, {
-      params: { address: city, key: GOOGLE_KEY },
+    const url = "https://geocoding-api.open-meteo.com/v1/search";
+    const res = await axios.get(url, {
+      params: { name: city, count: 1, language: "en", format: "json" }
     });
-
+    
     if (!res.data.results || res.data.results.length === 0) return null;
-
-    return res.data.results[0].geometry.location;
+    return res.data.results[0]; // { latitude, longitude, name, country }
   } catch (err) {
-    console.error("Geocode error:", err);
+    console.error("Geocoding error:", err);
     return null;
   }
 }
 
-// Step 2 — Google Weather (unofficial endpoint but works)
+// Open-Meteo Weather
 export async function getWeather(city = "Kolhapur") {
   try {
-    // If we want to strictly fail if geocode fails:
     const loc = await getCoordinates(city);
     if (!loc) {
        console.warn("Geocode failed, using fallback.");
        return getFallbackWeather(city);
     }
 
-    const weatherUrl = `https://weather.googleapis.com/v1/weather`;
-
+    const weatherUrl = "https://api.open-meteo.com/v1/forecast";
     const res = await axios.get(weatherUrl, {
       params: {
-        lat: loc.lat,
-        lng: loc.lng,
-        key: GOOGLE_KEY,
-        hourly: "temperature_2m",
-      },
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        current_weather: true,
+      }
     });
 
-    // Check if response structure matches expectation, handle potential variations if needed
-    // Assuming the user's provided structure is correct for this specific endpoint
-    // Check if response structure matches expectation, handle potential variations if needed
-    // Assuming the user's provided structure is correct for this specific endpoint
-    if (!res.data || !res.data.currentConditions) {
-       console.warn("Weather data missing, using fallback.");
-       return getFallbackWeather(city);
-    }
+    const current = res.data.current_weather;
 
     return {
-      temp: res.data.currentConditions.temperature,
-      description: res.data.currentConditions.description || "Sunny",
-      humidity: res.data.currentConditions.humidity || "40%",
-      wind: res.data.currentConditions.wind || "10 km/h",
-      city,
+      temp: current.temperature,
+      description: getWeatherDescription(current.weathercode),
+      humidity: "N/A", // Open-Meteo basic free tier doesn't send humidity in current_weather easily without extra params
+      wind: `${current.windspeed} km/h`,
+      city: loc.name,
     };
   } catch (err) {
     console.error("Weather error:", err);
@@ -64,9 +50,23 @@ export async function getWeather(city = "Kolhapur") {
   }
 }
 
+// WMO Weather interpretation codes (https://open-meteo.com/en/docs)
+function getWeatherDescription(code) {
+  const codes = {
+    0: "Clear sky",
+    1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Depositing rime fog",
+    51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+    61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+    80: "Slight showers", 81: "Moderate showers", 82: "Violent showers",
+    95: "Thunderstorm", 96: "Thunderstorm + hail"
+  };
+  return codes[code] || "Variable";
+}
+
 function getFallbackWeather(city) {
   return {
-    temp: 32,
+    temp: 25,
     description: "Cloudy (Demo)",
     humidity: "65%",
     wind: "12 km/h",

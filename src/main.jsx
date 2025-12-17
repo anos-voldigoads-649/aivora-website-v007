@@ -12,6 +12,8 @@ import SOS from "./pages/SOS";
 import Skills from "./pages/Skills";
 import Profile from "./pages/Profile";
 import MapView from "./pages/MapView";
+import Track from "./pages/Track"; // ADD THIS
+import "./leafletIconFix"; // FIX LEAFLET ICONS
 
 import ProtectedRoute from "./services/ProtectedRoute"; // ADD THIS
 import "./styles.css";
@@ -24,6 +26,7 @@ createRoot(document.getElementById("root")).render(
           {/* PUBLIC PAGES */}
           <Route path="/" element={<Login />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/track/:id" element={<Track />} />
 
           {/* PROTECTED PAGES */}
           <Route

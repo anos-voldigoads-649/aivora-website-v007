@@ -20,7 +20,7 @@ export async function postAIChat(token, text) {
 }
 
 export async function sendSOS(token, location) {
-  return fetch("http://localhost:5000/api/sos", {
+  return fetch("http://localhost:5000/api/sos/alert", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

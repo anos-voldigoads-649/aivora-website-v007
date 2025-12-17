@@ -1,237 +1,276 @@
-// src/pages/SOS.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import { auth, db } from "../services/AuthContext";
-import { collection, addDoc, doc, setDoc, getDocs, deleteDoc } from "firebase/firestore";
-import { sendSOS } from "../services/api";
+import { motion } from "framer-motion";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+
+
+
+// Auto center helper
+function Recenter({ lat, lng }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng]);
+  }, [lat, lng, map]);
+  return null;
+}
 
 export default function SOS() {
-  const [status, setStatus] = useState("");
+  // Use [lat, lng] array for Leaflet
   const [location, setLocation] = useState(null);
-  const [contacts, setContacts] = useState([]);
-  const [editing, setEditing] = useState(null); // contact id or null
-  const [form, setForm] = useState({ name: "", phone: "" });
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
+  const [status, setStatus] = useState("");
+  const [phone, setPhone] = useState("");
+  const [numbers, setNumbers] = useState([]);
 
-  const user = auth.currentUser;
-
-  // Load Google Maps script (only once)
+  /* ---------------- LOAD SAVED NUMBERS ---------------- */
   useEffect(() => {
-    if (!window.google) {
-      const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_API_KEY}&libraries=places`;
-      s.async = true;
-      s.onload = () => initGeolocation();
-      document.head.appendChild(s);
-    } else {
-      initGeolocation();
-    }
-    // load contacts for current user
-    if (user) loadContacts();
-    // eslint-disable-next-line
-  }, [user]);
+    const saved = JSON.parse(localStorage.getItem("sosNumbers")) || [];
+    setNumbers(saved);
+  }, []);
 
-  // Load contacts from Firestore (collection: users/{uid}/sosContacts)
-  async function loadContacts() {
-    try {
-      const uid = auth.currentUser.uid;
-      const col = collection(db, "users", uid, "sosContacts");
-      const snap = await getDocs(col);
-      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setContacts(arr);
-    } catch (err) {
-      console.error("Load contacts error", err);
-    }
-  }
-
-  function initGeolocation() {
-    if (!navigator.geolocation) {
-      setStatus("Geolocation not supported");
-      return;
-    }
-    setStatus("Getting location...");
+  /* ---------------- GEO LOCATION ---------------- */
+  useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      pos => {
+      (pos) => {
+        // Leaflet uses [lat, lng]
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(loc);
-        setStatus("");
-        renderMap(loc);
       },
-      () => setStatus("Permission denied")
+      () => setStatus("❌ Location permission denied")
     );
-  }
+  }, []);
 
-  function renderMap(loc) {
-    if (!mapRef.current || !window.google) return;
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: loc,
-      zoom: 15,
-    });
-
-    markerRef.current = new window.google.maps.Marker({
-      position: loc,
-      map,
-      title: "Your Location",
-    });
-  }
-
-  // Add contact to Firestore
-  async function addContact(e) {
-    e.preventDefault();
-    if (!form.name || !form.phone) return alert("Enter name & phone");
-    try {
-      const uid = auth.currentUser.uid;
-      const col = collection(db, "users", uid, "sosContacts");
-      await addDoc(col, { name: form.name, phone: form.phone });
-      setForm({ name: "", phone: "" });
-      loadContacts();
-    } catch (err) {
-      console.error("Add contact error", err);
-      alert("Failed to add contact");
+  /* ---------------- PHONE MANAGEMENT ---------------- */
+  function addNumber() {
+    if (!phone || !phone.startsWith("+")) {
+      alert("Enter valid phone number with country code");
+      return;
     }
+    if (numbers.includes(phone)) return;
+
+    const updated = [...numbers, phone];
+    setNumbers(updated);
+    localStorage.setItem("sosNumbers", JSON.stringify(updated));
+    setPhone("");
   }
 
-  // Start editing contact
-  function startEdit(c) {
-    setEditing(c.id);
-    setForm({ name: c.name, phone: c.phone });
+  function removeNumber(num) {
+    const updated = numbers.filter((n) => n !== num);
+    setNumbers(updated);
+    localStorage.setItem("sosNumbers", JSON.stringify(updated));
   }
 
-  // Save edit
-  async function saveEdit(e) {
-    e.preventDefault();
-    try {
-      const uid = auth.currentUser.uid;
-      await setDoc(doc(db, "users", uid, "sosContacts", editing), {
-        name: form.name,
-        phone: form.phone,
-      });
-      setEditing(null);
-      setForm({ name: "", phone: "" });
-      loadContacts();
-    } catch (err) {
-      console.error("Save edit error", err);
-      alert("Failed to save");
-    }
-  }
+  /* ---------------- TRIGGER SOS ---------------- */
+  const [shareLink, setShareLink] = useState(null);
 
-  // Delete
-  async function removeContact(id) {
-    if (!confirm("Delete contact?")) return;
-    try {
-      const uid = auth.currentUser.uid;
-      await deleteDoc(doc(db, "users", uid, "sosContacts", id));
-      loadContacts();
-    } catch (err) {
-      console.error("Delete error", err);
-      alert("Failed to delete");
-    }
-  }
-
-  // Trigger SOS — calls backend Netlify function
   async function triggerSOS() {
-    if (!location) return setStatus("Location not available");
-    if (!contacts.length) return setStatus("No SOS contacts. Add at least one.");
+    if (!location) return setStatus("Location unavailable");
+    if (numbers.length === 0) return setStatus("Add at least one number");
 
-    setStatus("Sending SOS...");
+    setStatus("🚨 Sending SOS...");
+
+    // 1. Start Live Tracking (Localhost)
+    const sosId = crypto.randomUUID();
+    setShareLink(`${window.location.origin}/track/${sosId}`);
+
+    navigator.geolocation.watchPosition(
+      (pos) => {
+        fetch("http://localhost:5000/sos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sosId,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          }),
+        }).catch(e => console.error("Tracking upload failed", e));
+      },
+      console.error,
+      { enableHighAccuracy: true }
+    );
+
+    // 2. Send Alerts (Netlify Function)
     try {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const res = await fetch("/.netlify/functions/sos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location, // { lat: ..., lng: ... }
+          numbers,
+          trackLink: `${window.location.origin}/track/${sosId}`
+        }),
+      });
 
-      // send payload to backend: { contacts: [{name,phone}], location }
-      const payload = { contacts, location };
-
-      const res = await sendSOS(token, payload); // frontend helper uses BASE /.netlify/functions
-      // sendSOS returns { ok: true, results: [...] } or throws
-      if (res?.ok) {
-        setStatus("🚨 SOS sent successfully!");
+      if (res.ok) {
+        setStatus("🚨 SOS SENT & TRACKING ACTIVE!");
       } else {
-        setStatus("Failed to send SOS");
+        const text = await res.text();
+        setStatus(`FAILED: ${text}`);
       }
     } catch (err) {
-      console.error(err);
-      setStatus("Error sending SOS");
+      setStatus("❌ Network error");
     }
   }
 
   return (
-    <div>
+    <div className="sos-root">
       <Navbar />
 
-      <div style={{ padding: 20 }}>
-        <h2>Emergency SOS</h2>
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="sos-card"
+      >
+        <h1>🚨 Emergency SOS</h1>
 
-        {/* Map */}
-        <div
-          ref={mapRef}
-          style={{
-            width: "100%",
-            height: "360px",
-            borderRadius: 10,
-            marginBottom: 12,
-            border: "1px solid #ddd",
-          }}
-        />
-
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-          {/* Left: contacts / form */}
-          <div style={{ flex: 1, minWidth: 320 }}>
-            <h3>Your SOS Contacts</h3>
-            <div style={{ display: "grid", gap: 10 }}>
-              {contacts.map(c => (
-                <div key={c.id} style={{ padding: 10, background: "#fafafa", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <strong>{c.name}</strong>
-                    <div style={{ fontSize: 13 }}>{c.phone}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => startEdit(c)}>Edit</button>
-                    <button onClick={() => removeContact(c.id)}>Delete</button>
-                  </div>
-                </div>
-              ))}
-              {contacts.length === 0 && <div>No contacts yet. Add one below.</div>}
-            </div>
-
-            <div style={{ marginTop: 18 }}>
-              <h4>{editing ? "Edit contact" : "Add contact"}</h4>
-              <form onSubmit={editing ? saveEdit : addContact} style={{ display: "grid", gap: 8 }}>
-                <input placeholder="Name" value={form.name} onChange={e => setForm(s => ({...s, name: e.target.value}))} />
-                <input placeholder="+91xxxxxxxxxx" value={form.phone} onChange={e => setForm(s => ({...s, phone: e.target.value}))} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button type="submit">{editing ? "Save" : "Add"}</button>
-                  {editing && <button type="button" onClick={() => { setEditing(null); setForm({name:"", phone:""}); }}>Cancel</button>}
-                </div>
-              </form>
-            </div>
+        {/* TRACKING LINK */}
+        {shareLink && (
+          <div style={{ 
+            background: "#fff", 
+            color: "#000", 
+            padding: 15, 
+            borderRadius: 10, 
+            marginBottom: 20,
+            wordBreak: "break-all"
+          }}>
+            <strong>🔴 Live Tracking Active:</strong><br/>
+            <a href={shareLink} target="_blank" rel="noreferrer" style={{ color: "blue" }}>
+              {shareLink}
+            </a>
           </div>
+        )}
 
-          {/* Right: SOS actions */}
-          <div style={{ width: 360 }}>
-            <div style={{ marginBottom: 12 }}>
-              <strong>Current Location:</strong>
-              <div>{location ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : "Not available"}</div>
-            </div>
-
-            <button
-              onClick={triggerSOS}
-              style={{
-                background: "red",
-                color: "white",
-                padding: "14px 18px",
-                borderRadius: 10,
-                fontSize: 18,
-                width: "100%",
-                fontWeight: "bold",
-              }}
-            >
-              SEND SOS 🚨
-            </button>
-
-            <div style={{ marginTop: 10, color: status.startsWith("🚨") ? "crimson" : "inherit" }}>{status}</div>
-          </div>
+        {/* PHONE INPUT */}
+        <div className="phone-box">
+          <input
+            placeholder="+91XXXXXXXXXX"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <button onClick={addNumber}>Add</button>
         </div>
-      </div>
+
+        {/* SAVED NUMBERS */}
+        <div className="numbers">
+          {numbers.map((n) => (
+            <div key={n} className="num">
+              {n}
+              <span onClick={() => removeNumber(n)}>✕</span>
+            </div>
+          ))}
+        </div>
+
+        {/* SOS BUTTON */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          animate={{ boxShadow: ["0 0 15px red", "0 0 40px red"] }}
+          transition={{ repeat: Infinity, duration: 1.2 }}
+          onClick={triggerSOS}
+          className="sos-btn"
+        >
+          SEND SOS
+        </motion.button>
+
+        <div className="status">{status}</div>
+
+        <div className="map-box">
+          {location ? (
+            <MapContainer
+              center={[location.lat, location.lng]}
+              zoom={16}
+              style={{ width: "100%", height: "100%" }}
+            >
+              <TileLayer
+                attribution="OpenStreetMap"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[location.lat, location.lng]}>
+                 <Popup>Your Location</Popup>
+              </Marker>
+              <Recenter lat={location.lat} lng={location.lng} />
+            </MapContainer>
+          ) : (
+            <div style={{ color: "#aaa", paddingTop: 100 }}>
+               Getting Location...
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      <style>{`
+        .sos-root {
+          min-height: 100vh;
+          background: linear-gradient(to bottom, #7f1d1d, #020617);
+          color: white;
+        }
+        .sos-card {
+          max-width: 800px;
+          margin: auto;
+          padding: 40px 20px;
+          text-align: center;
+        }
+        .phone-box {
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          margin-bottom: 10px;
+        }
+        input {
+          padding: 10px;
+          border-radius: 8px;
+          border: none;
+          width: 200px;
+        }
+        button {
+          padding: 10px 16px;
+          border-radius: 8px;
+          border: none;
+          background: #dc2626;
+          color: white;
+          cursor: pointer;
+        }
+        .numbers {
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+          margin-bottom: 20px;
+        }
+        .num {
+          background: rgba(255,255,255,0.15);
+          padding: 6px 12px;
+          border-radius: 20px;
+          display: flex;
+          gap: 6px;
+        }
+        .num span {
+          cursor: pointer;
+          color: #fca5a5;
+        }
+        .sos-btn {
+          width: 220px;
+          height: 220px;
+          border-radius: 50%;
+          font-size: 24px;
+          font-weight: bold;
+          background: radial-gradient(circle, #ff0000, #7f1d1d);
+          border: none;
+          color: white;
+          cursor: pointer;
+        }
+        .map-box {
+          margin-top: 25px;
+          height: 300px;
+          border-radius: 16px;
+          overflow: hidden;
+          background: #222;
+        }
+        .status {
+          margin-top: 20px;
+          font-weight: bold;
+          font-size: 1.2rem;
+        }
+      `}</style>
     </div>
   );
 }

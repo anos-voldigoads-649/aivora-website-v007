@@ -1,99 +1,210 @@
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f6f7fb;
+/* ===============================
+GLOBAL RESET & VARIABLES
+================================ */
+:root {
+--bg-dark: #0b0f1a;
+--bg-light: #11162a;
+--primary: #6cf2c2;
+--secondary: #5b8cff;
+--accent: #ff7ad9;
+--text-main: #e8ecf1;
+--text-muted: #9aa4bf;
+--radius-lg: 18px;
+--radius-md: 12px;
+--radius-sm: 8px;
+--transition-fast: 0.25s ease;
+--transition-med: 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  }
+
+html {
+font-size: 16px;
+scroll-behavior: smooth;
+}
+
+body {
+font-family: "Inter", system-ui, sans-serif;
+background: radial-gradient(circle at top, #121836, var(--bg-dark));
+color: var(--text-main);
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* ===============================
+RESPONSIVE TYPOGRAPHY
+================================ */
+h1 {
+font-size: clamp(2rem, 4vw, 3.5rem);
+font-weight: 700;
+}
+
+h2 {
+font-size: clamp(1.6rem, 3vw, 2.5rem);
+}
+
+p {
+font-size: clamp(0.95rem, 1.4vw, 1.05rem);
+color: var(--text-muted);
+line-height: 1.7;
+}
+
+/* ===============================
+LAYOUT UTILITIES
+================================ */
+.container {
+width: min(1200px, 92%);
+margin-inline: auto;
+}
+
+.grid {
+display: grid;
+gap: 1.5rem;
+}
+
+.flex {
+display: flex;
+gap: 1rem;
+}
+
+.center {
+align-items: center;
+justify-content: center;
+}
+
+/* ===============================
+NAVBAR
+================================ */
 .navbar {
-  display: flex;
-  justify-content: space-between;
-  padding: 15px;
-  background: #111827;
-  color: white;
+position: sticky;
+top: 0;
+backdrop-filter: blur(14px);
+background: rgba(10, 14, 34, 0.6);
+border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+z-index: 1000;
+}
+
+.navbar ul {
+display: flex;
+list-style: none;
+padding: 1rem 0;
 }
 
 .navbar a {
-  margin-left: 12px;
-  color: white;
-  text-decoration: none;
+text-decoration: none;
+color: var(--text-main);
+padding: 0.6rem 1rem;
+border-radius: var(--radius-sm);
+transition: var(--transition-fast);
 }
 
-.chatbox {
-  background: #fff;
-  padding: 10px;
-  min-height: 250px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-}
-/* PREMIUM SIDEBAR */
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 260px;
-  height: 100%;
-  background: linear-gradient(180deg, #1c1c1c, #000);
-  padding: 20px 0;
-  transition: 0.3s;
-  overflow: hidden;
-  box-shadow: 0px 0px 15px #0005;
+.navbar a:hover {
+background: linear-gradient(135deg, var(--secondary), var(--primary));
+color: #000;
 }
 
-.sidebar.close {
-  width: 75px;
+/* ===============================
+HERO SECTION
+================================ */
+.hero {
+min-height: 100vh;
+display: grid;
+place-items: center;
+text-align: center;
+padding: 4rem 1rem;
 }
 
-/* Logo */
-.sidebar .logo {
-  font-size: 22px;
-  font-weight: bold;
-  color: #fff;
-  text-align: center;
-  margin-bottom: 40px;
+.hero::after {
+content: "";
+position: absolute;
+inset: 0;
+background: radial-gradient(circle at center, rgba(108, 242, 194, 0.15), transparent 60%);
+animation: pulse 6s infinite alternate;
+z-index: -1;
 }
 
-/* Menu */
-.sidebar .menu {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+@keyframes pulse {
+from { opacity: 0.3; }
+to { opacity: 0.7; }
 }
 
-.sidebar .menu li {
-  margin: 20px 0;
+/* ===============================
+CARDS
+================================ */
+.card {
+background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+backdrop-filter: blur(18px);
+border-radius: var(--radius-lg);
+padding: 1.6rem;
+transition: var(--transition-med);
+border: 1px solid rgba(255,255,255,0.08);
 }
 
-.sidebar .menu li a {
-  color: #ddd;
-  text-decoration: none;
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  transition: 0.3s;
+.card:hover {
+transform: translateY(-10px) scale(1.02);
+box-shadow: 0 20px 40px rgba(0,0,0,0.45);
 }
 
-.sidebar .menu li a:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-left: 4px solid #4cafef;
-  padding-left: 16px;
+/* ===============================
+BUTTONS
+================================ */
+.btn {
+border: none;
+padding: 0.75rem 1.5rem;
+border-radius: var(--radius-md);
+font-size: 1rem;
+font-weight: 600;
+cursor: pointer;
+background: linear-gradient(135deg, var(--secondary), var(--accent));
+color: #fff;
+transition: var(--transition-med);
 }
 
-/* Toggle Button */
-.toggle-btn {
-  position: fixed;
-  top: 20px;
-  left: 280px;
-  background: #222;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  z-index: 200;
-  transition: 0.3s;
-  color: white;
+.btn:hover {
+transform: translateY(-3px);
+box-shadow: 0 10px 30px rgba(91,140,255,0.45);
 }
 
-.sidebar.close ~ .toggle-btn {
-  left: 95px;
+/* ===============================
+SCROLL ANIMATIONS
+================================ */
+.reveal {
+opacity: 0;
+transform: translateY(40px);
+transition: 0.8s ease;
+}
+
+.reveal.active {
+opacity: 1;
+transform: translateY(0);
+}
+
+/* ===============================
+FOOTER
+================================ */
+.footer {
+padding: 2rem 1rem;
+text-align: center;
+color: var(--text-muted);
+}
+
+/* ===============================
+RESPONSIVE BREAKPOINTS
+================================ */
+@media (max-width: 768px) {
+.navbar ul {
+justify-content: space-between;
+}
+
+.grid {
+grid-template-columns: 1fr;
+}
+
+.hero {
+padding-top: 6rem;
+}
 }
