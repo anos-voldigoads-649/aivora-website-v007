@@ -1,18 +1,19 @@
 // src/services/news.js
 import axios from "axios";
 
-// Using valid NewsAPI.org key from user
-const API_KEY = "1b4cabe237c2410dafa7ff09db1343f6";
+// API Key is now handled in netlify/functions/news.js
+// const API_KEY = "..." 
 
 export async function getLiveNews() {
   try {
     // NewsAPI endpoint for technology news
-    const url = `https://newsapi.org/v2/top-headlines`;
+    // Use local Netlify Function proxy to avoid 426 Browser restrictions
+    const url = `/.netlify/functions/news`;
     const res = await axios.get(url, {
       params: {
         country: "us",
         category: "technology",
-        apiKey: API_KEY,
+        // apiKey is handled by the backend function
         pageSize: 10,
       },
     });
